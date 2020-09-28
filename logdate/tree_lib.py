@@ -65,14 +65,11 @@ def tree_as_newick(a_tree,outfile=None,append=False):
 
 def __write_newick(node,outstream):
 	if node.is_leaf():
-			if node.taxon: ############################
-				outstream.write(node.label)
-			else:
-				outstream.write(str(node.label))
+		outstream.write(str(node.label))
 	else:
 		outstream.write('(')
 		is_first_child = True
-		for child in node.child_node_iter():
+		for child in node.child_nodes():
 			if is_first_child:
 				is_first_child = False
 			else:

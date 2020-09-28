@@ -87,7 +87,8 @@ def main():
         remove(args["output"])
 
     for treestr in tree_strings:  
-        tree = Tree.get(data=treestr,schema='newick',preserve_underscores=True) ####
+        #tree = Tree.get(data=treestr,schema='newick',preserve_underscores=True) ####
+        tree = read_tree(treestr,schema='newick')
         # labeling
         if do_label:
             nodeIdx = 0
