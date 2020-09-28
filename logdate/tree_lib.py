@@ -38,17 +38,19 @@ def prune_tree(T,RS):
             prune_node(T,leaf)
 
 def get_taxa(tree_file,scheme='newick'):
-	a_tree = Tree.get_from_path(tree_file,scheme,preserve_underscores=True)
-	return [leaf.label for leaf in a_tree.leaf_nodes()]
+	#a_tree = Tree.get_from_path(tree_file,scheme,preserve_underscores=True)
+	a_tree = read_tree(tree_file,schema=scheme)
+	return [leaf.label for leaf in a_tree.traverse_leaves()]
 
 def report_taxa(tree_file,scheme='newick',listing=True,counting=True):
-	a_tree = Tree()
-	a_tree.read_from_path(tree_file,scheme) #############
+	#a_tree = Tree()
+	#a_tree.read_from_path(tree_file,scheme)
+	a_tree = read_tree(tree_file,schema=scheme)
 	if listing:
-		for leaf in a_tree.leaf_nodes():
+		for leaf in a_tree.traverse_leaves():
 			logger.info(leaf.label)
 	if counting:
-		logger.info('Taxa #: ' + str(len(a_tree.leaf_nodes()))) ##########
+		logger.info('Taxa #: ' + str(len(list(a_tree.traverse_leaves()))))
 
 def tree_as_newick(a_tree,outfile=None,append=False):
 # dendropy's method to write newick seems to have problem ...
