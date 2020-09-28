@@ -27,10 +27,7 @@ def write_time_tree(tree,outfile=None,append=False):
 
 def __write__(node, outstream):
     if node.is_leaf():
-        try:
-            outstream.write(node.taxon.label)
-        except:
-            outstream.write(node.label)
+        outstream.write(node.label)
     else:
         outstream.write('(')
         is_first_child = True
@@ -175,7 +172,7 @@ def calibs_from_leaf_times(tree,sampling_time,short_terms_thres=0,tauMin=EPSILON
         if node is tree.root:
             continue
         if node.is_leaf():
-            node.fixed_age = node.tmin = node.tmax = sampling_time[node.taxon.label]
+            node.fixed_age = node.tmin = node.tmax = sampling_time[node.label]
             if not node.is_short:
                calibs.append((node,node.tmin,node.tmax)) 
             node.h =  0   
@@ -269,7 +266,7 @@ def setup_constraints(tree,calibs):
 def main():
     from sys import argv
 
-    tree = Tree.get_from_path(argv[1],'newick')
+    tree = read_tree(argv[1],'newick')
     sampling_time = {}
 
     with open(argv[2],'r') as fin:
