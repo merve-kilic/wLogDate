@@ -102,7 +102,7 @@ def main():
                 node.edge_length = max(node.edge_length,zero_len)
         # dating
         mu,f,x,tree = logDate_with_random_init(tree,f_obj,sampling_time,bw_time=bw_time,as_date=as_date,root_time=tR,leaf_time=tL,nrep=nrep,min_nleaf=10,maxIter=maxIter,seed=randseed,pseudo=pseudo,seqLen=seqLen,verbose=verbose)
-        tree_as_newick(tree,outfile=args["output"],append=True) ####
+        tree_as_newick(tree,outfile=args["output"],append=True)
         logger.info("Clock rate: " + str(mu))
         logger.info("Log score: " + str(f))
 
