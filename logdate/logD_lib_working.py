@@ -1,4 +1,4 @@
-from dendropy import Tree,TaxonNamespace
+#from dendropy import Tree,TaxonNamespace
 import numpy as np
 from math import exp,log, sqrt
 from scipy.optimize import minimize, LinearConstraint,Bounds
@@ -14,9 +14,10 @@ import platform
 from scipy.sparse import diags
 from scipy.sparse import csr_matrix
 #import cvxpy as cp
-import dendropy
+#import dendropy
 from logdate.tree_lib import tree_as_newick
 from sys import stdout
+from treeswift import *
 
 MAX_ITER = 50000
 MIN_NU = 1e-12
@@ -194,7 +195,7 @@ def random_timetree(tree,sampling_time,nrep,seed=None,root_age=None,leaf_age=Non
     
     for node in tree.traverse_preorder():
         if node.is_leaf():
-            node.fixed_age = smpl_times[node.taxon.label]
+            node.fixed_age = smpl_times[node.label]
         else:    
             node.fixed_age = None
     
@@ -245,15 +246,16 @@ def logDate_with_random_init(tree,f_obj,sampling_time,nrep=1,min_nleaf=3,maxIter
             print("New mutation rate: " + str(x_best[-2]))
             print("New log score: " + str(f_min))
             print("Time tree")
-            print(t_tree.as_string("newick"))
+            print(t_tree.as_string("newick")) ###
     
     mu = x_best[-2]
     print(x_best[-1]/mu)
     return mu,f_min,x_best,s_tree,t_tree 
 
 def scale_tree(tree,x):
-    taxa = tree.taxon_namespace
-    s_tree = Tree.get(data=tree.as_string("newick"),taxon_namespace=taxa,schema="newick",rooting="force-rooted")
+    taxa = tree.taxon_namespace ###
+    s_tree = Tree.get(data=tree.as_string("newick"),taxon_namespace=taxa,schema="newick",rooting="force-rooted") ###
+    #s_tree = read_tree_newick(tree)
 
     tree.is_rooted = True
     tree.encode_bipartitions()
@@ -263,7 +265,7 @@ def scale_tree(tree,x):
     mu = x[-2]
     for node in tree.traverse_postorder():
         if node is not tree.root and node.is_active:
-            key = node.bipartition    
+            key = node.bipartition     ###
             mapping[key] = node.idx
 
     for node in s_tree.traverse_postorder():
@@ -273,7 +275,7 @@ def scale_tree(tree,x):
                 node.edge_length *= x[idx]
 
     #t_tree = Tree.get(data=s_tree.as_string("newick"),taxon_namespace=taxa,schema="newick",rooting="force-rooted")
-    t_tree = Tree.get(data=s_tree.as_string("newick"),schema="newick",rooting="force-rooted")
+    t_tree = Tree.get(data=s_tree.as_string("newick"),schema="newick",rooting="force-rooted") ###
     
     for node in t_tree.traverse_postorder():
         if node is not t_tree.root:
@@ -328,7 +330,7 @@ def compute_divergence_time(tree,sampling_time):
         assert node.time is not None, "Failed to compute divergence time for node " + lb 
         lb += "=" + str(node.time)
         if node.is_leaf():
-            node.taxon.label = lb
+            node.label = lb
         else:
             node.label = lb    
                             
