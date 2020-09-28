@@ -1,9 +1,10 @@
 from bitsets import bitset
-from dendropy import Tree,Node
+#from dendropy import Tree,Node
 from sys import argv,stdout
 from math import log, sqrt, exp
 import random
 import logging
+from treeswift import *
 
 EPSILON_nu = 1e-5
 EPSILON_t = 1e-3
@@ -18,24 +19,24 @@ logger.addHandler(handler)
 logger.propagate = False
 
 def init_calibrate(tree,sampling_time):
-    for node in tree.postorder_node_iter():
+    for node in tree.traverse_postorder():
         node.time = None
         node.tmin = None
         node.tmax = None
-        lb = node.taxon.label if node.is_leaf() else node.label
+        lb = node.label
         if lb in sampling_time:
             node.time = sampling_time[lb]
 
 
 def mark_active(tree,sampling_time):
 # a node is active if it has a sampling time or one of its descendants is active
-    for node in tree.postorder_node_iter():
+    for node in tree.traverse_postorder():
         node.is_active = False
-        lb = node.taxon.label if node.is_leaf() else node.label
+        lb = node.label
         if lb in sampling_time:
             node.is_active = True
         elif not node.is_leaf():
-            for c in node.child_node_iter():
+            for c in node.child_nodes():
                 if c.is_active:
                     node.is_active = True
                     break
@@ -43,10 +44,10 @@ def mark_active(tree,sampling_time):
 def mark_as_leaf(tree):
 # a node is marked as_leaf if it is active but none of its children is active
 # must call mark_active before this function
-    for node in tree.postorder_node_iter():
+    for node in tree.traverse_postorder():
         if node.is_active:
             node.as_leaf = True
-            for c in node.child_node_iter():
+            for c in node.child_nodes():
                 if c.is_active:
                     node.as_leaf = False
                     break
@@ -60,14 +61,14 @@ def compute_tmin(tree):
 # we will postpone the RTT date of that node
 # if a node is calibrated (i.e. fixed) at time t, then we set tmin t for that node
 # MUST be called AFTER reset and mark_active
-    for node in tree.preorder_node_iter():
+    for node in tree.traverse_preorder():
         if node.time is not None: # this node is calibrated
             node.tmin = node.time
-        elif node is tree.seed_node:
+        elif node is tree.root:
             node.tmin = compute_date_as_root(node)    
         else:
-            #node.tmin = None if node is tree.seed_node else node.parent_node.tmin
-            node.tmin = node.parent_node.tmin
+            #node.tmin = None if node is tree.root else node.parent.tmin
+            node.tmin = node.parent.tmin
 
 def reset(tree,sampling_time):
     init_calibrate(tree,sampling_time)
@@ -82,7 +83,7 @@ def preprocess(tree,sampling_time):
 def get_calibrated_nodes(tree,sampling_time):
 # return the list of the calibrated internal nodes
     node_list = []
-    for node in tree.postorder_node_iter():
+    for node in tree.traverse_postorder():
         if not node.is_leaf():
             lb = node.label if not node.is_leaf() else node.taxon.label
             if lb in sampling_time:
@@ -93,20 +94,20 @@ def get_uncalibrated_nodes(tree,sampling_time,min_nleaf=3):
 # return the list of all uncalibrated nodes with at least min_nleaf active descended leaves
 # NOTE: MUST call mark_active and mark_as_leaf before this function
     node_list = []
-    for node in tree.postorder_node_iter():
+    for node in tree.traverse_postorder():
         if node.as_leaf:
             # a leaf can never be in this list because it must either be calibrated or inactive
             node.n_active_leaf = 1 if node.is_active else 0
         else:
-            node.n_active_leaf = sum([x.n_active_leaf for x in node.child_node_iter()])
-            if node is not tree.seed_node and node.n_active_leaf >= min_nleaf and node.label not in sampling_time:
+            node.n_active_leaf = sum([x.n_active_leaf for x in node.child_nodes()])
+            if node is not tree.root and node.n_active_leaf >= min_nleaf and node.label not in sampling_time:
                 node_list.append(node)
     return tuple(node_list)         
 
 def calibrate_set(tree,node_list):
     for node in node_list:
         node.time = "awaited"
-    for node in tree.postorder_node_iter():    
+    for node in tree.traverse_postorder():
         if node.time is not None:
             preprocess_node(node)
         if node.time == "awaited":             
@@ -120,14 +121,14 @@ def calibrate_set(tree,node_list):
             node.as_leaf = True
 
     # if the root has not been calibrated, now we have to calibrate it
-    if tree.seed_node.time is None:
-        preprocess_node(tree.seed_node)
-        #t = compute_date_as_root(tree.seed_node)
-        #tree.seed_node.time = t if t is not None else tree.seed_node.tmax - EPSILON_t
-        t_min = min(node.time for node in tree.preorder_node_iter() if node.time is not None)
-        tree.seed_node.time = t_min - EPSILON_t
-        date_from_root_and_leaves(tree.seed_node)
-    return tree.seed_node.time    
+    if tree.root.time is None:
+        preprocess_node(tree.root)
+        #t = compute_date_as_root(tree.root)
+        #tree.root.time = t if t is not None else tree.root.tmax - EPSILON_t
+        t_min = min(node.time for node in tree.traverse_preorder() if node.time is not None)
+        tree.root.time = t_min - EPSILON_t
+        date_from_root_and_leaves(tree.root)
+    return tree.root.time
 
 def preprocess_node(a_node):
     stack = [(a_node,False)]
@@ -142,7 +143,7 @@ def preprocess_node(a_node):
         elif passed:
            min_t = None
            min_child = None
-           for c in node.child_node_iter():
+           for c in node.child_nodes():
                if not c.is_active:
                    continue
                if min_t is None or c.nearest_t < min_t or (c.nearest_t == min_t and c.delta_b < min_child.delta_b): 
@@ -154,7 +155,7 @@ def preprocess_node(a_node):
            node.delta_b = min_child.delta_b + ( node.edge_length if node.edge_length else 0)
         else:
            stack.append((node,True))
-           stack += [(x,False) for x in node.child_node_iter() if x.is_active]
+           stack += [(x,False) for x in node.child_nodes() if x.is_active]
                 
 def compute_date_as_root(a_node):
 # NOTE: a_node MUST have tmin and tmax attributes
@@ -166,10 +167,10 @@ def compute_date_as_root(a_node):
     n = 0
 
     a_node.d2root = 0
-    stack = [ c for c in a_node.child_node_iter() if c.is_active ]
+    stack = [ c for c in a_node.child_nodes() if c.is_active ]
     while stack:
         node = stack.pop()
-        node.d2root = node.parent_node.d2root + node.edge_length
+        node.d2root = node.parent.d2root + node.edge_length
         if node.as_leaf:
             SDT += node.d2root*node.time
             SD  += node.d2root
@@ -177,7 +178,7 @@ def compute_date_as_root(a_node):
             ST  += node.time
             n   += 1
         else:
-            stack += [ c for c in node.child_node_iter() if c.is_active ] 
+            stack += [ c for c in node.child_nodes() if c.is_active ]
 
     t = None
     if abs(SD*ST-n*SDT) > EPSILON:
@@ -192,20 +193,20 @@ def date_from_root_and_leaves(root_node):
 # the root_node has some active nodes below it
 # also assumming that the preprocess_node function has been applied to root_node, so that
 # all active nodes below it already have the needed attributes (e.g. nearest_t, delta_b, delta_t, etc.) 
-    stack = [c for c in root_node.child_node_iter() if c.is_active]
+    stack = [c for c in root_node.child_nodes() if c.is_active]
     while stack:
         node = stack.pop()
         if not node.as_leaf:
-            stack += [c for c in node.child_node_iter() if c.is_active]
+            stack += [c for c in node.child_nodes() if c.is_active]
         if node.time is not None:
             assert node.time > root_node.time
             continue
         u = node.nearest_calibrated
-        delta_t = node.nearest_t - node.parent_node.time
+        delta_t = node.nearest_t - node.parent.time
         mu = node.delta_b / delta_t
 
         while u != node:
-            v = u.parent_node
+            v = u.parent
             v.time = u.time - u.edge_length/mu
             #print("Calibrated node " + v.label + " using " + root_node.label)
             assert v.time < u.time
@@ -218,19 +219,19 @@ def get_init_from_dated_tree(tree):
     b = 0
     c = 0
     x0 = []
-    for node in tree.postorder_node_iter():
-        if node is not tree.seed_node and node.is_active: # the root does not have edge_length; inactive nodes do not have time attributes
-            alpha = node.edge_length / (node.time - node.parent_node.time)
+    for node in tree.traverse_postorder():
+        if node is not tree.root and node.is_active: # the root does not have edge_length; inactive nodes do not have time attributes
+            alpha = node.edge_length / (node.time - node.parent.time)
             w = log(1 + sqrt(node.edge_length))
             a += w
             b -= 2*w*log(alpha)
             c += w*(log(alpha)**2)
 
     mu = exp(-b/2/a)
-    for node in tree.postorder_node_iter():
-        if node is not tree.seed_node and node.is_active:
-            #nu = mu*(node.time - node.parent_node.time)/node.edge_length if node.is_active else 1
-            nu = mu*(node.time - node.parent_node.time)/node.edge_length 
+    for node in tree.traverse_postorder():
+        if node is not tree.root and node.is_active:
+            #nu = mu*(node.time - node.parent.time)/node.edge_length if node.is_active else 1
+            nu = mu*(node.time - node.parent.time)/node.edge_length
             x0.append(nu)
     x0.append(mu)        
     return x0      
@@ -244,9 +245,9 @@ def get_random_initial(tree,random_subset,sampling_time):
     return x,t0
 
 def print_date(tree):
-    for node in tree.postorder_node_iter():
+    for node in tree.traverse_postorder():
        if node.is_active:
-           label = node.taxon.label if node.is_leaf() else node.label
+           label = node.label
            #print(label + " " + str(node.time))
 
 def random_date_init(tree, sampling_time, rep, min_nleaf=3, seed=None):

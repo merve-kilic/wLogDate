@@ -1,4 +1,4 @@
-from dendropy import Tree
+#from dendropy import Tree
 import numpy as np
 from scipy.sparse import csr_matrix,diags
 from scipy.optimize import LinearConstraint, minimize,Bounds
@@ -6,6 +6,8 @@ from logdate.util_lib import minVar_bisect
 from logdate.init_lib import random_date_init, preprocess_tree, date_from_root_and_leaves, preprocess_node, date_by_RTT
 from math import sqrt,log
 from sys import stdout
+from treeswift import *
+
 
 MAX_ITER = 50000
 MIN_NU = 1e-12
@@ -18,7 +20,7 @@ def write_time_tree(tree,outfile=None,append=False):
     else:
         outstream = stdout
 
-    __write__(tree.seed_node, outstream)
+    __write__(tree.root, outstream)
     outstream.write(";\n")
     if outfile:
         outstream.close()
@@ -32,7 +34,7 @@ def __write__(node, outstream):
     else:
         outstream.write('(')
         is_first_child = True
-        for child in node.child_node_iter():
+        for child in node.child_nodes():
             if is_first_child:
                 is_first_child = False
             else:
@@ -42,8 +44,8 @@ def __write__(node, outstream):
         if node.label is not None:
             outstream.write(str(node.label))
     
-    if not node.parent_node is None:
-        outstream.write(":" + str(node.time-node.parent_node.time))
+    if not node.parent is None:
+        outstream.write(":" + str(node.time-node.parent.time))
 
 def f_wlogDate():
     def f(x,*args):
@@ -73,7 +75,7 @@ def log_from_random_init(tree,sampling_time,root_age=None,leaf_age=None,brScale=
     print("Short-branch range estimation: ")     
     print("mu_RTT = " + str(mu_RTT))
     print("tauMin =  " + str(tauMin) + " tauMax = " + str(tauMax))
-    L = [node.edge_length for node in tree.postorder_node_iter() if node is not tree.seed_node]
+    L = [node.edge_length for node in tree.traverse_postorder() if node is not tree.root]
     cutoff = min(max_cutoff,minVar_bisect(L))
     calibs,count_short = calibs_from_leaf_times(tree,sampling_time,short_terms_thres=cutoff,tauMin=tauMin,tauMax=tauMax)
     constrs,weights = setup_constraints(tree,calibs)
@@ -88,7 +90,7 @@ def log_from_random_init(tree,sampling_time,root_age=None,leaf_age=None,brScale=
 
     # hacking (dirty) code to match the 'init_idx' and 'constr_idx'
     idx = 0
-    for node in tree.postorder_node_iter():
+    for node in tree.traverse_postorder():
         node.init_idx = idx
         idx += 1 
     
@@ -97,7 +99,7 @@ def log_from_random_init(tree,sampling_time,root_age=None,leaf_age=None,brScale=
         
         # matching constr_idx and init_idx
         x0 = [0]*(len(weights)+2)
-        for node in tree.postorder_node_iter():
+        for node in tree.traverse_postorder():
             if node.constr_idx is not None:
                 x0[node.constr_idx] = x1[node.init_idx]
         x0[0] = T0[i]*x1[-1]       # mu*t0
@@ -125,18 +127,18 @@ def log_from_random_init(tree,sampling_time,root_age=None,leaf_age=None,brScale=
 
 def compute_time_tree(tree,x_best,sampling_time):
     preprocess_tree(tree,sampling_time)
-    preprocess_node(tree.seed_node)
+    preprocess_node(tree.root)
 
     mu = x_best[1]
     t0 = x_best[0]/mu
-    tree.seed_node.time = t0
+    tree.root.time = t0
 
     unprocess_clades = []
 
-    for node in tree.preorder_node_iter():
-        if node is not tree.seed_node and node.constr_idx is not None:
+    for node in tree.traverse_preorder():
+        if node is not tree.root and node.constr_idx is not None:
             nu = x_best[node.constr_idx]
-            node.time = node.parent_node.time + node.edge_length*nu/mu
+            node.time = node.parent.time + node.edge_length*nu/mu
             if node.has_short_child and not node.is_short:
                 unprocess_clades.append(node)
     
@@ -144,22 +146,22 @@ def compute_time_tree(tree,x_best,sampling_time):
         preprocess_node(node)
         date_from_root_and_leaves(node)
 
-    #for node in tree.preorder_node_iter():
-    #    if node is not tree.seed_node:
-    #        node.edge_length = node.time - node.parent_node.time
+    #for node in tree.traverse_preorder():
+    #    if node is not tree.root:
+    #        node.edge_length = node.time - node.parent.time
                 
 
 def mark_short_terminals(tree,threshold):
     count_short = 0
-    for node in tree.postorder_node_iter():
-        if node is tree.seed_node:
+    for node in tree.traverse_postorder():
+        if node is tree.root:
             continue
         if node.is_leaf():
             node.is_short = node.edge_length <= threshold                
             node.has_short_child = False
         else:
-            node.is_short = node.edge_length <= threshold and ( sum(not c.is_short for c in node.child_node_iter()) == 0 )   
-            node.has_short_child = (sum(c.is_short for c in node.child_node_iter()) > 0)
+            node.is_short = node.edge_length <= threshold and ( sum(not c.is_short for c in node.child_nodes()) == 0 )
+            node.has_short_child = (sum(c.is_short for c in node.child_nodes()) > 0)
         count_short += int(node.is_short)
     return count_short        
         
@@ -168,9 +170,9 @@ def calibs_from_leaf_times(tree,sampling_time,short_terms_thres=0,tauMin=EPSILON
 
     calibs = []
 
-    for node in tree.postorder_node_iter():
+    for node in tree.traverse_postorder():
         node.fixed_age = None
-        if node is tree.seed_node:
+        if node is tree.root:
             continue
         if node.is_leaf():
             node.fixed_age = node.tmin = node.tmax = sampling_time[node.taxon.label]
@@ -178,9 +180,9 @@ def calibs_from_leaf_times(tree,sampling_time,short_terms_thres=0,tauMin=EPSILON
                calibs.append((node,node.tmin,node.tmax)) 
             node.h =  0   
         else:
-            node.tmax = min(c.tmax for c in node.child_node_iter())
+            node.tmax = min(c.tmax for c in node.child_nodes())
             node.tmin = None
-            node.h = max(c.h for c in node.child_node_iter() if c.is_short) + 1 if node.has_short_child else 0
+            node.h = max(c.h for c in node.child_nodes() if c.is_short) + 1 if node.has_short_child else 0
             if node.has_short_child and not node.is_short:
                 print("Found one short clade with h = " + str(node.h))
                 node.tmax -= node.h*tauMin
@@ -193,7 +195,7 @@ def setup_constraints(tree,calibs):
     idx = 2
     row = 0
     
-    for node in tree.postorder_node_iter():
+    for node in tree.traverse_postorder():
         node.constr_idx = None
 
     rows = []
@@ -244,7 +246,7 @@ def setup_constraints(tree,calibs):
             lowers.append(-np.inf)
             uppers.append(upper)
         
-        while node is not tree.seed_node:
+        while node is not tree.root:
             if node.constr_idx is None:
                 node.constr_idx = idx
                 weights.append(node.edge_length)
@@ -257,7 +259,7 @@ def setup_constraints(tree,calibs):
                 cols.append(node.constr_idx)
                 data.append(node.edge_length)
             
-            node = node.parent_node    
+            node = node.parent
         
         row += (1 + int(double_constr_flag))
 

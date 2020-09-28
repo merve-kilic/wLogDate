@@ -1,6 +1,7 @@
-from dendropy import Tree
+#from dendropy import Tree
 import logging
 from sys import stdout
+from treeswift import *
 
 logger = logging.getLogger("lca_lib")
 logger.setLevel(logging.INFO)
@@ -24,17 +25,17 @@ def find_LCAs(myTree,myQueries):
         H = {}
         F = {}
         def __traverse__(node,idx,h):
-            lb = node.taxon.label if node.is_leaf() else node.label
+            lb = node.label
             E.append(node)
             H[node] = h
             F[lb] = idx
             next_idx = idx+1
-            for c in node.child_node_iter():
+            for c in node.child_nodes():
                 next_idx = __traverse__(c,next_idx,h+1)
                 E.append(node)
                 next_idx += 1
             return next_idx    
-        __traverse__(myTree.seed_node,0,1)
+        __traverse__(myTree.root,0,1)
         return E,F,H
     
     def min_segment_tree(E,H):

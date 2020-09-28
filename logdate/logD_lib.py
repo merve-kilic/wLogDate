@@ -1,4 +1,4 @@
-from dendropy import Tree,TaxonNamespace
+#from dendropy import Tree,TaxonNamespace
 import numpy as np
 from math import exp,log, sqrt
 from scipy.optimize import minimize, LinearConstraint,Bounds
@@ -15,11 +15,12 @@ import platform
 from scipy.sparse import diags
 from scipy.sparse import csr_matrix
 #import cvxpy as cp
-import dendropy
+#import dendropy
 from logdate.tree_lib import tree_as_newick
 from sys import stdout
 from logdate.lca_lib import find_LCAs
 import logging
+from treeswift import *
 
 MAX_ITER = 50000
 MIN_NU = 1e-18
@@ -70,7 +71,8 @@ def f_wLogDate_changeVar(pseudo=0,seqLen=1000):
     return f,g,h
 
 def setup_constraint_changeVar(tree,smpl_times):
-    active_set = [node for node in tree.postorder_node_iter() if node.is_active]
+    #active_set = [node for node in tree.traverse_postorder() if node.is_active]
+    active_set = [node for node in tree.traverse_postorder() if node.is_active]
     N = len(active_set)-1
     cons_eq = []
     
@@ -80,9 +82,9 @@ def setup_constraint_changeVar(tree,smpl_times):
     for node in active_set:
         node.idx = idx
         idx += 1
-        new_constraint = None        
-        lb = node.taxon.label if node.is_leaf() else node.label
-        C = [ c for c in node.child_node_iter() if c.is_active ]
+        new_constraint = None
+        lb = node.label
+        C = [c for c in node.child_nodes() if c.is_active]
         
         if lb in smpl_times:
             node.height = 0
@@ -92,7 +94,7 @@ def setup_constraint_changeVar(tree,smpl_times):
             for c in C:
                 a = c.constraint[:-2] + [smpl_times[lb]+c.constraint[-2]] + [0]
                 cons_eq.append(a)
-        elif not node.as_leaf:  
+        elif not node.as_leaf:  ####### what is as_leaf?
             c0 = C[0]
             min_height = c0.height      
             closest_child = c0
@@ -108,7 +110,7 @@ def setup_constraint_changeVar(tree,smpl_times):
             new_constraint = closest_child.constraint
         
         node.constraint = new_constraint
-        if node is not tree.seed_node and node.constraint is not None:    
+        if node is not tree.root and node.constraint is not None:
             #node.constraint[node.idx] = sqrt(node.edge_length)
             node.constraint[node.idx] = 1
             b[node.idx] = node.edge_length
@@ -116,7 +118,7 @@ def setup_constraint_changeVar(tree,smpl_times):
     return cons_eq,b
 
 def setup_constraint(tree,smpl_times):
-    active_set = [node for node in tree.postorder_node_iter() if node.is_active]
+    active_set = [node for node in tree.traverse_postorder() if node.is_active]
     N = len(active_set)-1
     cons_eq = []
     
@@ -127,8 +129,8 @@ def setup_constraint(tree,smpl_times):
         node.idx = idx
         idx += 1
         new_constraint = None        
-        lb = node.taxon.label if node.is_leaf() else node.label
-        C = [ c for c in node.child_node_iter() if c.is_active ]
+        lb = node.label
+        C = [ c for c in node.child_nodes() if c.is_active ]
         
         if lb in smpl_times:
             node.height = 0
@@ -154,7 +156,7 @@ def setup_constraint(tree,smpl_times):
             new_constraint = closest_child.constraint
         
         node.constraint = new_constraint
-        if node is not tree.seed_node and node.constraint is not None:    
+        if node is not tree.root and node.constraint is not None:
             node.constraint[node.idx] = node.edge_length
             b[node.idx] = node.edge_length
     
@@ -162,7 +164,7 @@ def setup_constraint(tree,smpl_times):
                     
 
 def setup_constraint_old(tree,smpl_times):
-    active_set = [node for node in tree.postorder_node_iter() if node.is_active]
+    active_set = [node for node in tree.traverse_postorder() if node.is_active]
     N = len(active_set)-1
     cons_eq = []
     
@@ -173,7 +175,7 @@ def setup_constraint_old(tree,smpl_times):
         node.idx = idx
         idx += 1
         new_constraint = None        
-        lb = node.taxon.label if node.is_leaf() else node.label
+        lb = node.label
         if lb in smpl_times:
             node.height = 0
             new_constraint = [0.0]*(N+2)
@@ -181,7 +183,7 @@ def setup_constraint_old(tree,smpl_times):
             new_constraint[N+1] = 1           
         
         if not node.as_leaf:
-            C = [ c for c in node.child_node_iter() if c.is_active ]
+            C = [ c for c in node.child_nodes() if c.is_active ]
             # assumming each node has either one child or two children
             if len(C) == 1: # if it has one child
                 c1 = C[0]
@@ -220,14 +222,14 @@ def setup_constraint_old(tree,smpl_times):
                     cons_eq.append(a2)   
             
         node.constraint = new_constraint
-        if node is not tree.seed_node and node.constraint is not None:    
+        if node is not tree.root and node.constraint is not None:
             node.constraint[node.idx] = node.edge_length
             b[node.idx] = node.edge_length
     
     return cons_eq,b
 
 def logIt(tree,f_obj,cons_eq,b,x0=None,maxIter=MAX_ITER,pseudo=0,seqLen=1000,verbose=False):
-    N = len([node for node in tree.postorder_node_iter() if node.is_active])-1
+    N = len([node for node in tree.traverse_postorder() if node.is_active])-1
     bounds = Bounds(np.array([MIN_NU]*N+[MIN_MU]+[-np.inf]),np.array([np.inf]*(N+2)),keep_feasible=True)
     x_init = x0
     args = (b)
@@ -251,7 +253,7 @@ def setup_smpl_time(tree,sampling_time=None,bw_time=False,as_date=False,root_tim
 # Note: if as_date is True, bw_time will be ignored 
     smpl_times = {}   
     if root_time is not None: 
-        smpl_times[tree.seed_node.label] = root_time if not bw_time else -root_time
+        smpl_times[tree.root.label] = root_time if not bw_time else -root_time
     if leaf_time is not None:    
         for node in tree.leaf_nodes():
             smpl_times[node.taxon.label] = leaf_time if not bw_time else -leaf_time
@@ -293,7 +295,7 @@ def setup_smpl_time(tree,sampling_time=None,bw_time=False,as_date=False,root_tim
                 node.label = name
             lb = name
         else:
-            lb = node.taxon.label if node.is_leaf() else node.label            
+            lb = node.label
         smpl_times[lb] = time        
     return smpl_times   
 
@@ -301,7 +303,7 @@ def setup_smpl_time(tree,sampling_time=None,bw_time=False,as_date=False,root_tim
 def random_timetree(tree,sampling_time,nrep,seed=None,root_age=None,leaf_age=None,min_nleaf=3,fout=stdout):
     smpl_times = setup_smpl_time(tree,sampling_time=sampling_time,root_age=root_age,leaf_age=leaf_age)
     
-    for node in tree.preorder_node_iter():
+    for node in tree.traverse_preorder():
         if node.is_leaf():
             node.fixed_age = smpl_times[node.taxon.label]
         else:    
@@ -401,27 +403,32 @@ def read_lsd_results(inputDir):
         i += 1
     mu = float(mu)
 
-    taxa = TaxonNamespace()
-    tree = Tree.get_from_path(input_tree_file,schema="newick",taxon_namespace=taxa,rooting="force-rooted") 
+    #taxa = TaxonNamespace()
+    #tree = Tree.get_from_path(input_tree_file,schema="newick",taxon_namespace=taxa,rooting="force-rooted")
+    ###### does "force-rooted" mean tree must be rooted?
+    tree = read_tree_newick(input_tree_file)
+    if not tree.is_rooted:  # is is_rooted always true by default?
+        print("not sure") ##########
     tree.encode_bipartitions()
-    n = len(list(tree.leaf_node_iter()))
+    n = len(list(tree.traverse_leaves()))
     N = 2*n-2
     x0 = [10**-10]*N + [mu]
     
     idx = 0
     brlen_map = {}
     
-    for node in tree.postorder_node_iter():
-        if not node is tree.seed_node:
-            key = node.bipartition
+    for node in tree.traverse_postorder():
+        if not node is tree.root:
+            key = node.bipartition #######
             brlen_map[key] = (idx,node.edge_length)
             idx += 1
 
-    tree2 = Tree.get_from_path(result_tree_file,schema="newick",taxon_namespace=taxa,rooting="force-rooted")
+    #tree2 = Tree.get_from_path(result_tree_file,schema="newick",taxon_namespace=taxa,rooting="force-rooted")
+    tree2 = read_tree_newick(result_tree_file) #####
     tree2.encode_bipartitions()
     
-    for node in tree2.postorder_node_iter():
-        if not node is tree2.seed_node:
+    for node in tree2.traverse_postorder():
+        if not node is tree2.root:
             key = node.bipartition
             idx,el = brlen_map[key]
             if el > 0 and node.edge_length>0:
@@ -455,7 +462,7 @@ def calibrate_log_opt(tree,smpl_times,root_age=None,brScale=False,x0=None):
     def f2_gradient(x,*args):
         return np.array([0.5*2*log(1+sqrt(b))*log(z)/z for (z,b) in zip(x[:-1],args[0])] + [0])
     
-    n = len(list(tree.leaf_node_iter()))
+    n = len(list(tree.traverse_leaves()))
     N = 2*n-2
     cons_eq = []
     cons_ineq = []
@@ -466,7 +473,7 @@ def calibrate_log_opt(tree,smpl_times,root_age=None,brScale=False,x0=None):
     for i in range(N):
         cons_ineq.append({'type':'ineq','fun':h,'args':(i,)})
 
-    for node in tree.postorder_node_iter():
+    for node in tree.traverse_postorder():
         node.idx = idx
         idx += 1
         if node.is_leaf():
@@ -475,12 +482,12 @@ def calibrate_log_opt(tree,smpl_times,root_age=None,brScale=False,x0=None):
             node.constraint[N] = -smpl_times[node.taxon.label]
             b[node.idx] = node.edge_length
         else:
-            children = list(node.child_node_iter())
+            children = list(node.child_nodes())
                        
             a = np.array([ (children[0].constraint[i] - children[1].constraint[i]) for i in range(N+1) ])
             cons_eq.append({'type':'eq','fun':g,'args':(a,)})
 
-            if node is not tree.seed_node: 
+            if node is not tree.root:
                 node.constraint = children[0].constraint
                 node.constraint[node.idx] = node.edge_length
                 b[node.idx] = node.edge_length
@@ -500,8 +507,8 @@ def calibrate_log_opt(tree,smpl_times,root_age=None,brScale=False,x0=None):
     s = x[N]
     
     
-    #for node in tree.postorder_node_iter():
-    #    if node is not tree.seed_node:
+    #for node in tree.traverse_postorder():
+    #    if node is not tree.root:
     #        node.edge_length *= x[node.idx]/s
 
     return s,f1(x),x
@@ -511,8 +518,8 @@ def scale_tree(tree,x):
 
     mu = x[-2]
 
-    for node in tree.postorder_node_iter():
-        if node is not tree.seed_node:
+    for node in tree.traverse_postorder():
+        if node is not tree.root:
             nu = x[node.idx] if node.is_active else 1.0
             node.edge_length *= nu/mu
 
@@ -522,9 +529,9 @@ def compute_divergence_time(tree,sampling_time,x,bw_time=False,as_date=False):
 # must have at least one sampling time. Assumming the tree branches have been
 # converted to time unit and are consistent with the given sampling_time
     calibrated = []
-    for node in tree.postorder_node_iter():
+    for node in tree.traverse_postorder():
         node.time,node.mutation_rate = None,None
-        lb = node.taxon.label if node.is_leaf() else node.label
+        lb = node.label
         if lb in sampling_time:
             node.time = sampling_time[lb]
             calibrated.append(node)
@@ -532,24 +539,24 @@ def compute_divergence_time(tree,sampling_time,x,bw_time=False,as_date=False):
     stk = []
     # push to stk all the uncalibrated nodes that are linked to (i.e. is parent or child of) any node in the calibrated list
     for node in calibrated:
-        p = node.parent_node
+        p = node.parent
         if p is not None and p.time is None:
             stk.append(p)
         if not node.is_leaf():
-            stk += [ c for c in node.child_node_iter() if c.time is None ]            
+            stk += [ c for c in node.child_nodes() if c.time is None ]
     
     # compute divergence time of the remaining nodes
     while stk:
         node = stk.pop()
-        lb = node.taxon.label if node.is_leaf() else node.label
-        p = node.parent_node
+        lb = node.label
+        p = node.parent
         t = None
         if p is not None:
             if p.time is not None:
                 t = p.time + node.edge_length
             else:
                 stk.append(p)    
-        for c in node.child_node_iter():
+        for c in node.child_nodes():
             if c.time is not None:
                 t1 = c.time - c.edge_length
                 t = t1 if t is None else t
@@ -562,14 +569,14 @@ def compute_divergence_time(tree,sampling_time,x,bw_time=False,as_date=False):
 
     # place the divergence time and mutation rate onto the label
     mu = x[-2]
-    for node in tree.postorder_node_iter():
-        lb = node.taxon.label if node.is_leaf() else node.label
+    for node in tree.traverse_postorder():
+        lb = node.label
         assert node.time is not None, "Failed to compute divergence time for node " + lb
         if as_date:
             divTime = days_to_date(node.time)
         else:
             divTime = str(node.time) if not bw_time else str(-node.time)
-        if node is not tree.seed_node:
+        if node is not tree.root:
             nu = x[node.idx] if node.is_active else 1.0
             node.mutation_rate = mu/nu
             mut_rate = str(node.mutation_rate)

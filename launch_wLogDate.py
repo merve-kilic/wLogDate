@@ -2,13 +2,14 @@
 
 import logdate
 from logdate.logD_lib import logDate_with_random_init,f_wLogDate,f_wLogDate_changeVar
-from dendropy import Tree
+#from dendropy import Tree
 from os import remove,path
 from logdate.tree_lib import tree_as_newick
 import argparse
 from sys import argv,exit,stdout
 import logging
 from logdate.util_lib import date_to_days
+from treeswift import *
 
 def main():
     parser = argparse.ArgumentParser()
@@ -86,21 +87,21 @@ def main():
         remove(args["output"])
 
     for treestr in tree_strings:  
-        tree = Tree.get(data=treestr,schema='newick',preserve_underscores=True)
+        tree = Tree.get(data=treestr,schema='newick',preserve_underscores=True) ####
         # labeling
         if do_label:
             nodeIdx = 0
-            for node in tree.preorder_node_iter():
+            for node in tree.traverse_preorder():
                 if not node.is_leaf():
                     node.label = "I" + str(nodeIdx)
                     nodeIdx += 1
         # handle zero-length branches
-        for node in tree.preorder_node_iter():            
-            if node is not tree.seed_node:
+        for node in tree.traverse_preorder():
+            if node is not tree.root:
                 node.edge_length = max(node.edge_length,zero_len)
         # dating
         mu,f,x,tree = logDate_with_random_init(tree,f_obj,sampling_time,bw_time=bw_time,as_date=as_date,root_time=tR,leaf_time=tL,nrep=nrep,min_nleaf=10,maxIter=maxIter,seed=randseed,pseudo=pseudo,seqLen=seqLen,verbose=verbose)
-        tree_as_newick(tree,outfile=args["output"],append=True)
+        tree_as_newick(tree,outfile=args["output"],append=True) ####
         logger.info("Clock rate: " + str(mu))
         logger.info("Log score: " + str(f))
 
