@@ -63,7 +63,7 @@ def date_by_RTT(tree,sampling_time,rootAge=None,epsilon_t=EPSILON_t):
     for node in tree.traverse_postorder():
         node.as_leaf = False
         if node.is_leaf():
-            node.time = sampling_time[node.taxon.label]
+            node.time = sampling_time[node.label]
         else:
             node.time = None
     t0 = rootAge if rootAge is not None else compute_date_as_root(tree.root)
@@ -241,7 +241,7 @@ def main():
    tree_file = argv[1]
    sampling_time_file = argv[2]
 
-   tree = Tree.get_from_path(tree_file,"newick")
+   tree = read_tree(tree_file,"newick")
    sampling_time = {}
 
    with open(sampling_time_file,'r') as fin:
@@ -256,7 +256,7 @@ def main():
    for node in tree.traverse_postorder():
        node.as_leaf = False
        if node.is_leaf():
-           node.time = sampling_time[node.taxon.label]
+           node.time = sampling_time[node.label]
            node.nearest_leaf = node
            node.nearest_t = node.time
            node.delta_b = node.edge_length
