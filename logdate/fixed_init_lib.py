@@ -85,7 +85,7 @@ def get_calibrated_nodes(tree,sampling_time):
     node_list = []
     for node in tree.traverse_postorder():
         if not node.is_leaf():
-            lb = node.label if not node.is_leaf() else node.taxon.label
+            lb = node.label
             if lb in sampling_time:
                 node_list.append(node)
     return node_list            
