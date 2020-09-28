@@ -106,12 +106,12 @@ with open(argv[2],'r') as fin:
 LCAs = find_LCAs(myTree,queries)
 nodeIdx = 0
 for q,lca in zip(queries,LCAs):
-    lb = lca.label if not lca.is_leaf() else lca.taxon.label
+    lb = lca.label if not lca.is_leaf() else lca.label
     if not lb:
         lca.label = "I" + str(nodeIdx)
         nodeIdx += 1
     if lca.is_leaf():
-        print(q,lca.taxon.label)
+        print(q,lca.label)
     else:
         print(q,lca.label)  
 '''
