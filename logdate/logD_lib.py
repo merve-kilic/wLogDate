@@ -71,7 +71,6 @@ def f_wLogDate_changeVar(pseudo=0,seqLen=1000):
     return f,g,h
 
 def setup_constraint_changeVar(tree,smpl_times):
-    #active_set = [node for node in tree.traverse_postorder() if node.is_active]
     active_set = [node for node in tree.traverse_postorder() if node.is_active]
     N = len(active_set)-1
     cons_eq = []
@@ -255,8 +254,8 @@ def setup_smpl_time(tree,sampling_time=None,bw_time=False,as_date=False,root_tim
     if root_time is not None: 
         smpl_times[tree.root.label] = root_time if not bw_time else -root_time
     if leaf_time is not None:    
-        for node in tree.leaf_nodes():
-            smpl_times[node.taxon.label] = leaf_time if not bw_time else -leaf_time
+        for node in tree.traverse_leaves():
+            smpl_times[node.label] = leaf_time if not bw_time else -leaf_time
     
     # case 1: no sampling time given --> return the smpl_times defined by root_time and leaf_time
     if not sampling_time:
@@ -289,10 +288,7 @@ def setup_smpl_time(tree,sampling_time=None,bw_time=False,as_date=False,root_tim
         if node is None:
             continue
         if name:
-            if node.is_leaf():
-                node.taxon.label = name
-            else:
-                node.label = name
+            node.label = name
             lb = name
         else:
             lb = node.label
@@ -305,7 +301,7 @@ def random_timetree(tree,sampling_time,nrep,seed=None,root_age=None,leaf_age=Non
     
     for node in tree.traverse_preorder():
         if node.is_leaf():
-            node.fixed_age = smpl_times[node.taxon.label]
+            node.fixed_age = smpl_times[node.label]
         else:    
             node.fixed_age = None
     
@@ -381,7 +377,7 @@ def run_lsd(tree,sampling_time,outputDir=None):
     wdir = outputDir if outputDir is not None else mkdtemp()
     treefile = normpath(join(wdir,"mytree.tre"))
     tree_as_newick(tree,outfile=treefile,append=False)
-    call([lsd_exec,"-i",treefile,"-d",sampling_time,"-v","-c"])
+    call([lsd_exec,"-i",treefile,"-d",sampling_time,"-v","-c"]) ###################
     return wdir
         
 
@@ -407,9 +403,9 @@ def read_lsd_results(inputDir):
     #tree = Tree.get_from_path(input_tree_file,schema="newick",taxon_namespace=taxa,rooting="force-rooted")
     ###### does "force-rooted" mean tree must be rooted?
     tree = read_tree_newick(input_tree_file)
-    if not tree.is_rooted:  # is is_rooted always true by default?
-        print("not sure") ##########
-    tree.encode_bipartitions()
+    #if not tree.is_rooted:
+    #    print("not sure") ##########
+    #tree.encode_bipartitions() #################
     n = len(list(tree.traverse_leaves()))
     N = 2*n-2
     x0 = [10**-10]*N + [mu]
@@ -419,17 +415,19 @@ def read_lsd_results(inputDir):
     
     for node in tree.traverse_postorder():
         if not node is tree.root:
-            key = node.bipartition #######
+            #key = node.bipartition #######
+            key = node.label ########
             brlen_map[key] = (idx,node.edge_length)
             idx += 1
 
     #tree2 = Tree.get_from_path(result_tree_file,schema="newick",taxon_namespace=taxa,rooting="force-rooted")
     tree2 = read_tree_newick(result_tree_file) #####
-    tree2.encode_bipartitions()
+    #tree2.encode_bipartitions()
     
     for node in tree2.traverse_postorder():
         if not node is tree2.root:
-            key = node.bipartition
+            #key = node.bipartition
+            key = node.label
             idx,el = brlen_map[key]
             if el > 0 and node.edge_length>0:
                 x0[idx] = node.edge_length/float(el)
@@ -479,11 +477,11 @@ def calibrate_log_opt(tree,smpl_times,root_age=None,brScale=False,x0=None):
         if node.is_leaf():
             node.constraint = [0.0]*(N+1)
             node.constraint[node.idx] = node.edge_length
-            node.constraint[N] = -smpl_times[node.taxon.label]
+            node.constraint[N] = -smpl_times[node.label]
             b[node.idx] = node.edge_length
         else:
-            children = list(node.child_nodes())
-                       
+            children = node.child_nodes()
+
             a = np.array([ (children[0].constraint[i] - children[1].constraint[i]) for i in range(N+1) ])
             cons_eq.append({'type':'eq','fun':g,'args':(a,)})
 
