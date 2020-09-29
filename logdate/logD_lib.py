@@ -347,6 +347,7 @@ def logDate_with_random_init(tree,f_obj,sampling_time=None,bw_time=False,as_date
     mu = x_best[-2]
     return mu,f_min,x_best,tree
 
+'''
 def logDate_with_lsd(tree,sampling_time,root_age=None,brScale=False,lsdDir=None,seqLen=1000,maxIter=MAX_ITER):
     wdir = run_lsd(tree,sampling_time,outputDir=lsdDir)
     
@@ -372,68 +373,65 @@ def logDate_with_lsd(tree,sampling_time,root_age=None,brScale=False,lsdDir=None,
     scale_tree(tree,x)
 
     return mu,f,x,tree
+'''
 
+'''
+# obsolete function
 def run_lsd(tree,sampling_time,outputDir=None):
     wdir = outputDir if outputDir is not None else mkdtemp()
     treefile = normpath(join(wdir,"mytree.tre"))
     tree_as_newick(tree,outfile=treefile,append=False)
-    call([lsd_exec,"-i",treefile,"-d",sampling_time,"-v","-c"]) ###################
+    call([lsd_exec,"-i",treefile,"-d",sampling_time,"-v","-c"]) 
     return wdir
-        
+'''
 
+'''
 def read_lsd_results(inputDir):
-# suppose LSD was run on the "mytree.newick" and all the outputs are placed inside inputDir
-    log_file = normpath(join(inputDir, "mytree.tre.result")) 
-    input_tree_file = normpath(join(inputDir, "mytree.tre")) 
-    result_tree_file = normpath(join(inputDir, "mytree.tre.result.newick")) 
+    # suppose LSD was run on the "mytree.newick" and all the outputs are placed inside inputDir
+    log_file = normpath(join(inputDir, "mytree.tre.result"))
+    input_tree_file = normpath(join(inputDir, "mytree.tre"))
+    result_tree_file = normpath(join(inputDir, "mytree.tre.result.newick"))
 
-    s = open(log_file,'r').read()
+    s = open(log_file, 'r').read()
     i = s.find("Tree 1 rate ") + 12
     mu = ""
     found_dot = False
 
-    while (s[i] == '.' and not found_dot) or  (s[i] in [str(x) for x in range(10)]):
+    while (s[i] == '.' and not found_dot) or (s[i] in [str(x) for x in range(10)]):
         mu += s[i]
         if s[i] == '.':
             found_dot = True
         i += 1
     mu = float(mu)
 
-    #taxa = TaxonNamespace()
-    #tree = Tree.get_from_path(input_tree_file,schema="newick",taxon_namespace=taxa,rooting="force-rooted")
-    ###### does "force-rooted" mean tree must be rooted?
-    tree = read_tree_newick(input_tree_file)
-    #if not tree.is_rooted:
-    #    print("not sure") ##########
-    #tree.encode_bipartitions() #################
-    n = len(list(tree.traverse_leaves()))
-    N = 2*n-2
-    x0 = [10**-10]*N + [mu]
-    
+    taxa = TaxonNamespace()
+    tree = Tree.get_from_path(input_tree_file, schema="newick", taxon_namespace=taxa, rooting="force-rooted")
+    tree.encode_bipartitions()
+    n = len(list(tree.leaf_node_iter()))
+    N = 2 * n - 2
+    x0 = [10 ** -10] * N + [mu]
+
     idx = 0
     brlen_map = {}
-    
-    for node in tree.traverse_postorder():
-        if not node is tree.root:
-            #key = node.bipartition #######
-            key = node.label ########
-            brlen_map[key] = (idx,node.edge_length)
+
+    for node in tree.postorder_node_iter():
+        if not node is tree.seed_node:
+            key = node.bipartition
+            brlen_map[key] = (idx, node.edge_length)
             idx += 1
 
-    #tree2 = Tree.get_from_path(result_tree_file,schema="newick",taxon_namespace=taxa,rooting="force-rooted")
-    tree2 = read_tree_newick(result_tree_file) #####
-    #tree2.encode_bipartitions()
-    
-    for node in tree2.traverse_postorder():
-        if not node is tree2.root:
-            #key = node.bipartition
-            key = node.label
-            idx,el = brlen_map[key]
-            if el > 0 and node.edge_length>0:
-                x0[idx] = node.edge_length/float(el)
+    tree2 = Tree.get_from_path(result_tree_file, schema="newick", taxon_namespace=taxa, rooting="force-rooted")
+    tree2.encode_bipartitions()
+
+    for node in tree2.postorder_node_iter():
+        if not node is tree2.seed_node:
+            key = node.bipartition
+            idx, el = brlen_map[key]
+            if el > 0 and node.edge_length > 0:
+                x0[idx] = node.edge_length / float(el)
 
     return x0        
-        
+'''
 
 def calibrate_log_opt(tree,smpl_times,root_age=None,brScale=False,x0=None):
     def f0(x,*args):
