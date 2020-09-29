@@ -1,4 +1,4 @@
-#! /usr/bin/env python
+#! /usr/bin/env python3
 
 import logdate
 from logdate.logD_lib import logDate_with_random_init,f_wLogDate,f_wLogDate_changeVar
@@ -86,8 +86,7 @@ def main():
     if path.exists(args["output"]):
         remove(args["output"])
 
-    for treestr in tree_strings:  
-        #tree = Tree.get(data=treestr,schema='newick',preserve_underscores=True) ####
+    for treestr in tree_strings:
         tree = read_tree(treestr,schema='newick')
         # labeling
         if do_label:
