@@ -1,3 +1,5 @@
+* Version 1.0.2:
+    * Translated from DendroPy to TreeSwift
 * Version 1.0.1:
     * Allow polytomies in input trees
     * Enable divergence times in date format (i.e. %Y-%m-%d) via -d
