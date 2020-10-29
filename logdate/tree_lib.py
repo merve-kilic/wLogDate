@@ -52,21 +52,20 @@ def report_taxa(tree_file,scheme='newick',listing=True,counting=True):
         if counting:
             logger.info('Taxa #: ' + str(len(list(a_tree.traverse_leaves()))))
 
-'''
 def tree_as_newick(a_tree,outfile=None,append=False):
-# dendropy's method to write newick seems to have problem ...
-	if outfile:
-		outstream = open(outfile,'a') if append else open(outfile,'w')
-	else:
-		outstream = sys.stdout
+    # dendropy's method to write newick seems to have problem ...
+    if outfile:
+        outstream = open(outfile,'a') if append else open(outfile,'w')
+    else:
+        outstream = sys.stdout
 
-	__write_newick(a_tree.root,outstream)
+    __write_newick(a_tree.root,outstream)
 
-	outstream.write(";\n")
-	if outfile:
-		outstream.close()
+    outstream.write(";\n")
+    if outfile:
+        outstream.close()
+
 '''
-
 def tree_as_newick(a_tree,outfile=None,append=False):
     if outfile:
         outstream = open(outfile,'a') if append else open(outfile,'w')
@@ -77,25 +76,23 @@ def tree_as_newick(a_tree,outfile=None,append=False):
 
     if outfile:
         outstream.close()
-
-
 '''
+
 def __write_newick(node,outstream):
-	if node.is_leaf():
-		outstream.write(str(node.label))
-	else:
-		outstream.write('(')
-		is_first_child = True
-		for child in node.child_nodes():
-			if is_first_child:
-				is_first_child = False
-			else:
-				outstream.write(',')
-			__write_newick(child,outstream)
-		outstream.write(')')
-	if not node.is_leaf() and node.label is not None:
-			outstream.write(str(node.label))
+    if node.is_leaf():
+        outstream.write(str(node.label))
+    else:
+        outstream.write('(')
+        is_first_child = True
+        for child in node.child_nodes():
+            if is_first_child:
+                is_first_child = False
+            else:
+                outstream.write(',')
+            __write_newick(child,outstream)
+        outstream.write(')')
+    if not node.is_leaf() and node.label is not None:
+        outstream.write(str(node.label))
 
-	if not node.edge_length is None:
-		outstream.write(":"+str(node.edge_length))
-'''
+    if not node.edge_length is None:
+        outstream.write(":"+str(node.edge_length))
