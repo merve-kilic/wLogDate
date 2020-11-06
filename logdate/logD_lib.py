@@ -8,7 +8,7 @@ from tempfile import mkdtemp
 from shutil import copyfile, rmtree
 from os import remove
 from copy import deepcopy
-from logdate.fixed_init_lib import random_date_init
+from logdate.fixed_init_lib import random_date_init, mark_active, mark_as_leaf
 from logdate.util_lib import date_to_days, days_to_date
 #from logdate.init_lib_old import random_date_init
 import platform
@@ -93,7 +93,7 @@ def setup_constraint_changeVar(tree,smpl_times):
             for c in C:
                 a = c.constraint[:-2] + [smpl_times[lb]+c.constraint[-2]] + [0]
                 cons_eq.append(a)
-        elif not node.as_leaf:  ####### what is as_leaf?
+        elif not node.as_leaf:
             c0 = C[0]
             min_height = c0.height      
             closest_child = c0
@@ -312,11 +312,68 @@ def random_timetree(tree,sampling_time,nrep,seed=None,root_age=None,leaf_age=Non
     for x in X:
         s_tree,t_tree = scale_tree(tree,x)
         fout.write(t_tree.as_string("newick"))
-'''    
+'''
+
+def get_init_from_dated_tree(tree,time_tree):
+    d = {}
+    for node in time_tree.traverse_postorder():
+        lb = node.label.split('[')[0]
+        d[lb] = node.edge_length
+    a = 0
+    b = 0
+    c = 0
+    x0 = []
+    for node in tree.traverse_postorder():
+        #print(node.is_active)
+        if node is not tree.root and node.is_active: # the root does not have edge_length; inactive nodes do not have time attributes
+            alpha = node.edge_length / (d[node.label])
+            #print(node.edge_length)
+            w = log(1 + sqrt(node.edge_length))
+            a += w
+            #print(w,alpha,log(alpha))
+            b -= 2*w*log(alpha)
+            c += w*(log(alpha)**2)
+
+    mu = exp(-b/2/a)
+    #print(a,mu)
+    for node in tree.traverse_postorder():
+        if node is not tree.root and node.is_active:
+            #nu = mu*(node.time - node.parent.time)/node.edge_length if node.is_active else 1
+            nu = mu*(d[node.label])/node.edge_length
+            x0.append(nu)
+    x0.append(mu)
+    return x0
+
+def logDate_with_init(tree, time_tree, t0, f_obj, sampling_time=None, bw_time=False, as_date=False, root_time=0, leaf_time=1,
+                             nrep=1, min_nleaf=3, maxIter=MAX_ITER, seed=None, pseudo=0, seqLen=1000, verbose=False):
+    smpl_times = setup_smpl_time(tree, sampling_time=sampling_time, bw_time=bw_time, as_date=as_date,
+                                 root_time=root_time, leaf_time=leaf_time)
+    #X, seed, T0 = random_date_init(tree, smpl_times, nrep, min_nleaf=min_nleaf, seed=seed)
+    # ^save what these are from old code and read from file here
+    # see if it returns same log score
+
+    mark_active(tree, smpl_times)
+    mark_as_leaf(tree)
+    x = get_init_from_dated_tree(tree,time_tree)
+
+    cons_eq, b = setup_constraint_changeVar(tree, smpl_times)
+
+    x0 = x + [t0]
+    # z0 = [x_i*sqrt(b_i) for (x_i,b_i) in zip(x0[:-2],b)] + [x0[-2],x0[-1]]
+    z0 = [x_i * b_i for (x_i, b_i) in zip(x0[:-2], b)] + [x0[-2], x0[-1]]
+    _, f, z = logIt(tree, f_obj, cons_eq, b, x0=z0, maxIter=maxIter, pseudo=pseudo, seqLen=seqLen, verbose=verbose)
+    x_best = [z_i / b_i for (z_i, b_i) in zip(z[:-2], b)] + [z[-2], z[-1]]
+
+    scale_tree(tree, x_best)
+    compute_divergence_time(tree, smpl_times, x_best, bw_time=bw_time, as_date=as_date)
+    mu = x_best[-2]
+    return mu, f, x_best, tree
 
 def logDate_with_random_init(tree,f_obj,sampling_time=None,bw_time=False,as_date=False,root_time=0,leaf_time=1,nrep=1,min_nleaf=3,maxIter=MAX_ITER,seed=None,pseudo=0,seqLen=1000,verbose=False):
     smpl_times = setup_smpl_time(tree,sampling_time=sampling_time,bw_time=bw_time,as_date=as_date,root_time=root_time,leaf_time=leaf_time)    
     X,seed,T0 = random_date_init(tree,smpl_times,nrep,min_nleaf=min_nleaf,seed=seed)
+    # ^save what these are from old code and read from file here
+    # see if it returns same log score
 
     logger.info("Finished initialization with random seed " + str(seed))
     f_min = None
@@ -343,12 +400,12 @@ def logDate_with_random_init(tree,f_obj,sampling_time=None,bw_time=False,as_date
             logger.info("New mutation rate: " + str(x_best[-2]))
             logger.info("New log score: " + str(f_min))
     scale_tree(tree, x_best)
-    compute_divergence_time(tree, smpl_times, x_best, bw_time=bw_time, as_date=as_date)
+    compute_divergence_time(tree, smpl_times, x_best, lsdbw_time=bw_time, as_date=as_date)
     mu = x_best[-2]
     return mu,f_min,x_best,tree
 
 '''
-def logDate_with_lsd(tree,sampling_time,root_age=None,brScale=False,lsdDir=None,seqLen=1000,maxIter=MAX_ITER):
+def logDate_with_lsd(tree,sampling_time,root_age=None,brScale=False,Dir=None,seqLen=1000,maxIter=MAX_ITER):
     wdir = run_lsd(tree,sampling_time,outputDir=lsdDir)
     
     x0 = read_lsd_results(wdir)
