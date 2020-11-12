@@ -400,7 +400,7 @@ def logDate_with_random_init(tree,f_obj,sampling_time=None,bw_time=False,as_date
             logger.info("New mutation rate: " + str(x_best[-2]))
             logger.info("New log score: " + str(f_min))
     scale_tree(tree, x_best)
-    compute_divergence_time(tree, smpl_times, x_best, lsdbw_time=bw_time, as_date=as_date)
+    compute_divergence_time(tree, smpl_times, x_best, bw_time=bw_time, as_date=as_date)
     mu = x_best[-2]
     return mu,f_min,x_best,tree
 
