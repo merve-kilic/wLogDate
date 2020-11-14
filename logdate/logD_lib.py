@@ -295,24 +295,22 @@ def setup_smpl_time(tree,sampling_time=None,bw_time=False,as_date=False,root_tim
         smpl_times[lb] = time        
     return smpl_times   
 
-'''    
-def random_timetree(tree,sampling_time,nrep,seed=None,root_age=None,leaf_age=None,min_nleaf=3,fout=stdout):
-    smpl_times = setup_smpl_time(tree,sampling_time=sampling_time,root_age=root_age,leaf_age=leaf_age)
+#def random_timetree(tree,sampling_time,nrep,seed=None,root_age=None,leaf_age=None,min_nleaf=3,fout=stdout):
+#    smpl_times = setup_smpl_time(tree,sampling_time=sampling_time,root_age=root_age,leaf_age=leaf_age)
     
-    for node in tree.traverse_preorder():
-        if node.is_leaf():
-            node.fixed_age = smpl_times[node.label]
-        else:    
-            node.fixed_age = None
+#    for node in tree.traverse_preorder():
+#        if node.is_leaf():
+#            node.fixed_age = smpl_times[node.label]
+#        else:    
+#            node.fixed_age = None
     
-    setup_constraint(tree,smpl_times,root_age=root_age)
-    X,seed,_ = random_date_init(tree,smpl_times,nrep,min_nleaf=min_nleaf,rootAge=root_age,seed=seed)
-    logger.info("Finished initialization with random seed " + str(seed))
+#    setup_constraint(tree,smpl_times,root_age=root_age)
+#    X,seed,_ = random_date_init(tree,smpl_times,nrep,min_nleaf=min_nleaf,rootAge=root_age,seed=seed)
+#    logger.info("Finished initialization with random seed " + str(seed))
     
-    for x in X:
-        s_tree,t_tree = scale_tree(tree,x)
-        fout.write(t_tree.as_string("newick"))
-'''
+#    for x in X:
+#        s_tree,t_tree = scale_tree(tree,x)
+#        fout.write(t_tree.as_string("newick"))
 
 def get_init_from_dated_tree(tree,time_tree):
     d = {}
