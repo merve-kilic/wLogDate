@@ -9,14 +9,24 @@ path=dirname(realpath(__file__))
 class TestLogIt(unittest.TestCase):
     """Test the logIt function"""
 
-    def test1(self):
+    def test1a(self):
         """Use the published wLogDate tree as initial"""
         inTreeFile = path + "/test_data/small_test/viruses/Test1/input.nwk"
         startTreeFile = path + "/test_data/small_test/viruses/Test1/wld_ref.nwk"
         smplTimeFile = path + "/test_data/small_test/viruses/Test1/sampling_time.txt"
         refFile = path + "/test_data/small_test/viruses/Test1/true_vs_wld_ref.txt"
         failures, max_violate= test_logIt(inTreeFile, startTreeFile, smplTimeFile,refFile)
-        self.assertTrue(failures > 0, msg="Failed test 1 with maximum relative error " + str(max_violate*100) + "%")
+        self.assertTrue(failures > 0, msg="Failed test 1a with maximum relative error " + str(max_violate*100) + "%")
+
+    def test1b(self):
+        """Use a random tree as initial"""
+        inTreeFile = path + "/test_data/small_test/viruses/Test1/input.nwk"
+        startTreeFile = path + "/test_data/small_test/viruses/Test1/rand1.nwk"
+        smplTimeFile = path + "/test_data/small_test/viruses/Test1/sampling_time.txt"
+        refFile = path + "/test_data/small_test/viruses/Test1/true_vs_wld_ref.txt"
+        failures, max_violate= test_logIt(inTreeFile, startTreeFile, smplTimeFile,refFile)
+        self.assertTrue(failures > 0, msg="Failed test 1b with maximum relative error " + str(max_violate*100) + "%")
+        
 
 if __name__ == '__main__':
     unittest.main()

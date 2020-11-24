@@ -82,7 +82,7 @@ def compute_divergence_time(tree,sampling_time,bw_time=False,as_date=False):
                 t1 = c.time - c.edge_length
                 t = t1 if t is None else t
                 if abs(t-t1) > EPSILON_t:
-                    logger.warning("Inconsistent divergence time computed for node " + lb + ". Violate by " + str(abs(t-t1)))
+                    print(t,t1,abs(t-t1))
                 #assert abs(t-t1) < EPSILON_t, "Inconsistent divergence time computed for node " + lb
             else:
                 stk.append(c)
